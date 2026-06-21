@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kapsul Waktu: Nusantara Chronicles (32-Bit RPG)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: VT323 (Dialog), Press Start 2P (Title), Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js for Audio -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        title: ['"Press Start 2P"', 'cursive'],
+                        dialog: ['VT323', 'monospace'],
+                    },
+                    colors: {
+                        'rpg-blue': '#1e3a8a',
+                        'rpg-blue-dark': '#172554',
+                        'rpg-border': '#facc15', // Gold
+                        'rpg-text': '#f8fafc',
+                        'hp-green': '#22c55e',
+                        'hp-red': '#ef4444',
+                    },
+                    boxShadow: {
+                        'rpg-box': 'inset 0 0 20px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.5)',
+                        'choice-btn': 'inset 0 -4px 0 rgba(0,0,0,0.3), 0 4px 6px rgba(0,0,0,0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #0f172a;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 32-bit RPG Dialog Box Style (Harvest Moon / FF Style) */
+        .vn-dialog-box {
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 4px solid #eab308;
+            border-radius: 12px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 8px 30px rgba(0,0,0,0.6);
+            position: relative;
+        }
+
+        .vn-dialog-box::after {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+        .vn-name-plate {
+            background: linear-gradient(to right, #b45309, #78350f);
+            border: 3px solid #fde047;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* Scanline effect to give it a retro monitor feel */
+        .scanlines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 50;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+        }
+
+        /* Dynamic Background Classes */
+        .bg-sriwijaya {
+            background: linear-gradient(to bottom, #38bdf8 0%, #0369a1 40%, #1e3a8a 100%);
+        }
+        .bg-sriwijaya::before {
+            content:''; position:absolute; inset:0; 
+            background-image: radial-gradient(circle at 70% 30%, #fde047 5%, transparent 20%);
+        }
+        
+        .bg-diponegoro {
+            background: linear-gradient(to bottom, #022c22 0%, #064e3b 50%, #000000 100%);
+        }
+        .bg-proklamasi {
+            background: linear-gradient(to bottom, #78350f 0%, #451a03 50%, #171717 100%);
+        }
+
+        /* Animations */
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+
+        .blinking-cursor::after { content: ' \25BC'; animation: blink 1s step-end infinite; color: #fde047; font-size: 1.2em;}
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Custom Scrollbar for Choices */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #eab308; border-radius: 4px; }
+    </style>
+</head>
+
+<body class="h-screen w-screen flex flex-col font-sans relative">
+    <div class="scanlines"></div>
+
+    <!-- HEADER UI -->
+    <header class="p-2 md:p-3 bg-slate-900/90 border-b-4 border-slate-700 shadow-lg z-[60] flex justify-between items-center backdrop-blur relative">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-800 rounded flex items-center justify-center border-2 border-indigo-300">
+                <i class="fa-solid fa-compact-disc text-white animate-spin" style="animation-duration: 4s;"></i>
+            </div>
+            <div>
+                <h1 class="font-title text-white text-[10px] md:text-xs tracking-wide text-shadow-sm">KAPSUL WAKTU</h1>
+                <p class="text-[12px] text-yellow-400 font-dialog mt-1 tracking-widest">v3.0.32-Bit</p>
+            </div>
+        </div>
+
+        <!-- Status Panel -->
+        <div id="status-panel" class="hidden flex gap-4 md:gap-8 items-center bg-slate-800 px-4 py-2 rounded border-2 border-slate-600 shadow-inner">
+            <!-- HP / Energi -->
+            <div class="flex flex-col items-end">
+                <span class="text-[12px] font-dialog text-slate-400 mb-0.5">ENERGI TEMPORAL</span>
+                <div class="flex gap-2 items-center">
+                    <div class="w-24 md:w-32 h-3 bg-slate-900 border border-slate-700 rounded overflow-hidden">
+                        <div id="hp-bar" class="h-full bg-hp-green transition-all duration-300 w-full"></div>
+                    </div>
+                    <span id="hp-text" class="font-dialog text-lg text-white font-bold w-8 text-right">100</span>
+                </div>
+            </div>
+            <!-- Artifak -->
+            <div class="flex flex-col items-center">
+                <span class="text-[12px] font-dialog text-slate-400 mb-0.5">ARTIFAK</span>
+                <div class="flex gap-2 bg-slate-900 p-1 rounded border border-slate-700">
+                    <div id="art-0" class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-600 text-xs"><i class="fa-solid fa-lock"></i></div>
+                    <div id="art-1" class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-600 text-xs"><i class="fa-solid fa-lock"></i></div>
+                    <div id="art-2" class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-600 text-xs"><i class="fa-solid fa-lock"></i></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 relative overflow-hidden bg-black flex flex-col">
+        
+        <!-- ================= MAIN MENU ================= -->
+        <div id="scene-menu" class="absolute inset-0 z-40 bg-slate-900 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-500">
+            <!-- Retro Sun/Grid Background -->
+            <div class="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+                <div class="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-indigo-900 to-transparent"></div>
+                <div class="w-full h-full" style="background-image: linear-gradient(0deg, transparent 24%, rgba(99, 102, 241, .3) 25%, rgba(99, 102, 241, .3) 26%, transparent 27%, transparent 74%, rgba(99, 102, 241, .3) 75%, rgba(99, 102, 241, .3) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(99, 102, 241, .3) 25%, rgba(99, 102, 241, .3) 26%, transparent 27%, transparent 74%, rgba(99, 102, 241, .3) 75%, rgba(99, 102, 241, .3) 76%, transparent 77%, transparent); background-size: 50px 50px;"></div>
+            </div>
+
+            <h1 class="font-title text-2xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 mb-2 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] relative z-30 leading-snug tracking-wider">KAPSUL WAKTU</h1>
+            <h2 class="font-title text-sm md:text-xl text-white mb-10 relative z-30 tracking-widest">NUSANTARA CHRONICLES</h2>
+            
+            <div class="vn-dialog-box p-6 mb-10 max-w-md w-full relative z-30">
+                <p class="font-dialog text-xl md:text-2xl text-slate-300 mb-6 text-left leading-relaxed">
+                    Sistem temporal diaktifkan.<br>
+                    Tugas Anda: Mengumpulkan artifak sejarah dengan menjawab ujian dari para leluhur.<br>
+                    Jika energi habis, Anda akan terjebak di masa lalu selamanya.
+                </p>
+                <button onclick="engine.startGame()" class="w-full font-title text-sm md:text-base bg-gradient-to-b from-yellow-400 to-yellow-600 text-slate-900 py-4 rounded shadow-choice-btn hover:brightness-110 active:translate-y-1 transition-all">
+                    MULAI LOMPATAN
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= VISUAL NOVEL SCENE ================= -->
+        <div id="scene-vn" class="absolute inset-0 z-20 hidden flex-col transition-all duration-1000 bg-black">
+            
+            <!-- Background Layer -->
+            <div id="vn-bg" class="absolute inset-0 transition-all duration-1000 opacity-0 scale-105 bg-sriwijaya"></div>
+            
+            <!-- Environment Decor / Particles -->
+            <div id="vn-particles" class="absolute inset-0 pointer-events-none opacity-50"></div>
+
+            <!-- Portrait Layer -->
+            <div class="absolute bottom-48 md:bottom-56 left-1/2 -translate-x-1/2 md:left-24 md:-translate-x-0 w-64 h-80 flex items-end justify-center z-30 pointer-events-none">
+                <!-- NPC Sprite -->
+                <div id="vn-portrait-container" class="relative animate-float transition-all duration-500 opacity-0 translate-y-10">
+                    <div id="vn-portrait-bg" class="w-48 h-48 md:w-64 md:h-64 rounded-full bg-gradient-to-t from-black/80 to-transparent flex items-center justify-center border-b-4 border-slate-500/50 relative">
+                        <i id="vn-portrait-icon" class="fa-solid fa-user text-9xl md:text-[150px] text-white drop-shadow-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interaction Layer (Top Right - Era Info) -->
+            <div class="absolute top-4 right-4 z-40">
+                <div class="bg-black/60 border border-white/20 p-2 rounded backdrop-blur">
+                    <span class="font-title text-[8px] md:text-[10px] text-yellow-400 block mb-1">ERA LOKASI</span>
+                    <span id="vn-era-text" class="font-dialog text-xl md:text-2xl text-white">Abad ke-8</span>
+                </div>
+            </div>
+
+            <!-- UI Dialog Box Layer (Bottom) -->
+            <div class="absolute bottom-0 w-full p-2 md:p-6 z-40">
+                <div class="max-w-5xl mx-auto w-full relative">
+                    
+                    <!-- Name Plate -->
+                    <div id="vn-name-plate" class="vn-name-plate absolute -top-5 md:-top-6 left-4 md:left-8 px-4 md:px-8 py-1 md:py-2 z-50 transition-opacity duration-300">
+                        <span id="vn-name" class="font-title text-xs md:text-sm text-white tracking-wider">NAMA NPC</span>
+                    </div>
+
+                    <!-- Dialog Box -->
+                    <div id="vn-dialog-box" class="vn-dialog-box w-full min-h-[160px] md:min-h-[180px] p-5 md:p-8 pt-8 md:pt-10 flex flex-col justify-between cursor-pointer" onclick="engine.nextDialog()">
+                        <p id="vn-text" class="font-dialog text-2xl md:text-3xl text-rpg-text leading-relaxed tracking-wide drop-shadow-md">
+                            Teks dialog akan muncul di sini...
+                        </p>
+                        <div id="vn-continue-icon" class="self-end mt-2 text-yellow-400 animate-bounce hidden">
+                            <i class="fa-solid fa-caret-down text-2xl"></i>
+                        </div>
+                    </div>
+
+                    <!-- Choices Container (Overlays Dialog slightly) -->
+                    <div id="vn-choices" class="absolute bottom-full left-0 w-full p-4 flex-col gap-3 hidden z-50 max-h-[50vh] overflow-y-auto pb-8">
+                        <!-- Buttons injected via JS -->
+                    </div>
+
+                </div>
+            </div>
+            
+            <!-- Damage Overlay Effect -->
+            <div id="damage-overlay" class="absolute inset-0 bg-red-600/0 pointer-events-none z-[100] transition-colors duration-200"></div>
+        </div>
+
+        <!-- ================= END SCENE ================= -->
+        <div id="scene-end" class="absolute inset-0 z-[70] bg-black hidden flex-col items-center justify-center p-6 text-center">
+            <h2 id="end-title" class="font-title text-3xl md:text-5xl text-white mb-6 relative z-10 leading-relaxed">MISI SELESAI</h2>
+            
+            <div class="vn-dialog-box p-8 max-w-md w-full relative z-10 mb-8 bg-slate-800">
+                <div class="flex flex-col items-center mb-6 border-b border-slate-600 pb-6">
+                    <span class="font-dialog text-xl text-slate-400 mb-2">SISA ENERGI:</span>
+                    <span id="end-hp" class="font-title text-4xl text-hp-green drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]">100</span>
+                </div>
+                
+                <span class="font-dialog text-xl text-slate-400 mb-4 block">ARTIFAK TERKUMPUL:</span>
+                <div id="end-artifacts" class="flex justify-center gap-6 text-4xl mb-6">
+                    <!-- Inject Artifacts -->
+                </div>
+                <p id="end-msg" class="font-dialog text-2xl leading-relaxed text-yellow-200 bg-black/50 p-4 rounded border border-yellow-600/30">
+                    Pesan penutup.
+                </p>
+            </div>
+            
+            <button onclick="location.reload()" class="relative z-10 font-title text-sm bg-slate-700 text-white px-8 py-4 rounded shadow-choice-btn hover:bg-slate-600 active:translate-y-1 transition-all border border-slate-500">
+                KEMBALI KE MENU
+            </button>
+        </div>
+
+    </main>
+
+    <script>
+        // --- VISUAL NOVEL DATABASE (STORY & QUESTIONS) ---
+        // Format: Array of Chapters. Each Chapter has an array of 'nodes'.
+        // node type: 'dialog' (just read) or 'question' (must answer to proceed).
+        const vnData = [
+            // CHAPTER 1: SRIWIJAYA
+            {
+                id: "ch1",
+                bgClass: "bg-sriwijaya",
+                eraText: "Selat Malaka, Abad ke-8",
+                npc: { name: "Biksu I-Tsing", icon: "fa-book-journal-whills", color: "#fcd34d" },
+                nodes: [
+                    { type: 'dialog', text: "Pengembara, kau muncul dari udara kosong. Jubahmu aneh, tapi auramu tidak berniat jahat." },
+                    { type: 'dialog', text: "Aku I-Tsing. Aku singgah di Fo-Shih (Sriwijaya) untuk menerjemahkan naskah Buddha sebelum melanjutkan ke India." },
+                    { type: 'dialog', text: "Lihatlah bandar ini. Ribuan kapal dari Tiongkok, Arab, dan Jawa berlabuh. Tapi tahukah kau mengapa Sriwijaya bisa menjadi semegah ini?" },
+                    { 
+                        type: 'question', 
+                        text: "[Pilih Jawaban yang Tepat]",
+                        options: [
+                            { text: "Mereka memiliki teknologi mesin uap yang canggih.", correct: false, response: "Mesin uap? Di abad ke-8? Kau melantur. Fokuslah!" },
+                            { text: "Lokasi geografis strategis di jalur pelayaran Selat Malaka.", correct: true, response: "Tepat. Selat Malaka adalah urat nadi dunia. Angin monsun memaksa kapal singgah berbulan-bulan di sini." },
+                            { text: "Sriwijaya adalah benua yang luas.", correct: false, response: "Salah. Mereka bukan penguasa daratan raksasa, melainkan penguasa lautan." }
+                        ]
+                    },
+                    { type: 'dialog', text: "Dengan posisi strategis itu, Sriwijaya tidak sekadar menjadi tempat singgah. Mereka memonopoli komoditas berharga." },
+                    { 
+                        type: 'question', 
+                        text: "[Komoditas Utama Sriwijaya]",
+                        options: [
+                            { text: "Baja ringan dan minyak bumi.", correct: false, response: "Kau dari masa depan sungguhan ya? Sayangnya di masa ini komoditas itu belum laku." },
+                            { text: "Gandum dan kain wool tebal.", correct: false, response: "Udara di sini panas, pengembara. Wool tidak laku di khatulistiwa." },
+                            { text: "Rempah-rempah, kapur barus, dan emas.", correct: true, response: "Benar! Kapur barus (Kamper) dan rempah adalah emas hijau yang diburu saudagar Arab dan Tiongkok." }
+                        ]
+                    },
+                    { type: 'dialog', text: "Luar biasa pengetahuanmu. Tapi kekuatan maritim juga butuh legitimasi religius. Prasasti Kedukan Bukit mencatat perjalanan suci 'Minanga Tamwan'." },
+                    { 
+                        type: 'question', 
+                        text: "[Makna Prasasti Kedukan Bukit]",
+                        options: [
+                            { text: "Perjalanan militer dan spiritual Dapunta Hyang membangun wanua (negara).", correct: true, response: "Tepat sekali. Membawa 20.000 tentara dengan perahu, ia menyatukan kawasan ini dengan restu dewata." },
+                            { text: "Perjanjian damai dengan Kerajaan Chola.", correct: false, response: "Belum, konflik dengan Chola baru terjadi berabad-abad kemudian." },
+                            { text: "Catatan resep masakan kerajaan.", correct: false, response: "Tentu tidak. Ini prasasti kenegaraan, bukan lontar kuliner!" }
+                        ]
+                    },
+                    { type: 'dialog', text: "Kau layak melangkah lebih jauh, Pengembara. Terimalah miniatur kapal Jong ini. Ini akan memandu lompatan waktumu berikutnya." },
+                    { type: 'reward', artifact: { icon: "fa-ship", name: "Miniatur Jong", color: "text-blue-400" } }
+                ]
+            },
+            
+            // CHAPTER 2: DIPONEGORO
+            {
+                id: "ch2",
+                bgClass: "bg-diponegoro",
+                eraText: "Gua Selarong, Tahun 1825",
+                npc: { name: "P. Diponegoro", icon: "fa-chess-knight", color: "#f8fafc" },
+                nodes: [
+                    { type: 'dialog', text: "Berhenti! Siapa kau? Pakaianmu bukan seragam Londo (Belanda), bukan pula pengikutku." },
+                    { type: 'dialog', text: "Kau datang dari masa depan? Hm, terserahlah. Saat ini kami sedang mengatur siasat. Perang besar baru saja pecah." },
+                    { 
+                        type: 'question', 
+                        text: "[Sebab Khusus Meletusnya Perang Diponegoro]",
+                        options: [
+                            { text: "Belanda menaikkan pajak tanah secara tiba-tiba.", correct: false, response: "Itu penderitaan lama yang menumpuk. Tapi ada satu penghinaan besar yang tak bisa kuterima." },
+                            { text: "Pemasangan patok jalan Belanda melintasi makam leluhur di Tegalrejo.", correct: true, response: "Benar! Sadumuk bathuk, sanyari bumi ditohi tekan pati. Kehormatan leluhur tak bisa dibeli." },
+                            { text: "Belanda menangkap kerabat keraton tanpa alasan.", correct: false, response: "Bukan itu pemicu utamanya, meski kelakuan mereka memang busuk." }
+                        ]
+                    },
+                    { type: 'dialog', text: "Rakyat dari berbagai golongan bergabung denganku. Petani, santri, hingga bangsawan. Taktik gerilya kami merepotkan Jenderal De Kock." },
+                    { type: 'dialog', text: "Namun, Londo itu licik. Ia tidak melawan kami di hutan terbuka." },
+                    { 
+                        type: 'question', 
+                        text: "[Taktik Balasan Jenderal De Kock]",
+                        options: [
+                            { text: "Membombardir hutan dengan pesawat terbang.", correct: false, response: "Pesawat? Mesin terbang apa yang kau bicarakan? Ini tahun 1825." },
+                            { text: "Taktik Benteng Stelsel (Sistem Benteng).", correct: true, response: "Tepat. Mereka membangun benteng di setiap wilayah yang ditaklukkan, menghubungkannya dengan jalan." },
+                            { text: "Meracuni seluruh sumber air di Jawa.", correct: false, response: "Itu taktik kotor, tapi bukan itu strategi utama militer mereka." }
+                        ]
+                    },
+                    { type: 'dialog', text: "Benteng Stelsel itu mempersempit ruang gerak kami. Logistik terputus. Satu per satu panglimaku tertangkap atau menyerah." },
+                    { 
+                        type: 'question', 
+                        text: "[Siapakah panglima kavaleri andalan Pangeran Diponegoro?]",
+                        options: [
+                            { text: "Tuanku Imam Bonjol.", correct: false, response: "Beliau berjuang di tanah Minang, bukan di sini bersamaku." },
+                            { text: "Sentot Alibasya Prawirodirjo.", correct: true, response: "Ah, Sentot... Pemuda jenius dalam taktik kavaleri kuda. Pasukannya sangat ditakuti Londo." },
+                            { text: "Kiai Mojo.", correct: false, response: "Kiai Mojo adalah penasihat spiritualku, bukan panglima kavaleri." }
+                        ]
+                    },
+                    { type: 'dialog', text: "Pengetahuanmu tentang perjuangan kami sangat tajam. Bawalah Keris Kiai Omyang ini. Ingatlah, perlawanan sejati lahir dari rakyat." },
+                    { type: 'reward', artifact: { icon: "fa-khanda", name: "Keris Kiai Omyang", color: "text-slate-300" } }
+                ]
+            },
+
+            // CHAPTER 3: PROKLAMASI
+            {
+                id: "ch3",
+                bgClass: "bg-proklamasi",
+                eraText: "Jl. Imam Bonjol No.1, 17 Ags 1945",
+                npc: { name: "Bung Hatta", icon: "fa-glasses", color: "#d1d5db" },
+                nodes: [
+                    { type: 'dialog', text: "Ssst... jangan berisik. Di luar ada patroli Gunseikanbu. Malam ini sangat krusial, Bung." },
+                    { type: 'dialog', text: "Kami baru saja kembali dari Rengasdengklok. Para pemuda itu sangat berapi-api mendeask kemerdekaan." },
+                    { 
+                        type: 'question', 
+                        text: "[Tujuan Peristiwa Rengasdengklok]",
+                        options: [
+                            { text: "Mengamankan Soekarno-Hatta dari pengaruh Jepang agar segera memproklamasikan kemerdekaan.", correct: true, response: "Benar. Golongan muda takut kami masih menunggu janji kemerdekaan dari PPKI bentukan Jepang." },
+                            { text: "Menyusun strategi perang melawan Sekutu.", correct: false, response: "Bukan. Jepang sudah menyerah pada Sekutu. Fokus kami adalah kemerdekaan." },
+                            { text: "Menyembunyikan teks proklamasi yang sudah jadi.", correct: false, response: "Teksnya bahkan belum kami buat saat di Rengasdengklok!" }
+                        ]
+                    },
+                    { type: 'dialog', text: "Kini kami berada di rumah Laksamana Maeda. Beliau simpati pada perjuangan kita. Teks ini harus segera dirumuskan." },
+                    { type: 'dialog', text: "Bung Karno yang menulis drafnya. Namun kalimat proklamasi ini menggunakan gaya bahasa yang unik." },
+                    { 
+                        type: 'question', 
+                        text: "[Makna Diksi Teks Proklamasi]",
+                        options: [
+                            { text: "Menggunakan bahasa provokatif agar rakyat segera mengangkat senjata.", correct: false, response: "Tidak. Jika provokatif, tentara Jepang di luar akan langsung membantai kita semua malam ini juga." },
+                            { text: "Kalimat diplomatis 'diselenggarakan dengan cara saksama' untuk menjamin transisi kekuasaan yang sah dan damai.", correct: true, response: "Pemikiran yang brilian! Kemerdekaan bukan hanya soal deklarasi, tapi soal de jure dan pengakuan internasional." },
+                            { text: "Menggunakan bahasa Jepang agar Maeda senang.", correct: false, response: "Jangan bercanda. Ini naskah kemerdekaan bangsa Indonesia." }
+                        ]
+                    },
+                    { type: 'dialog', text: "Draf tulisan tangan sudah disetujui. Sekarang harus diketik rapi sebelum fajar menyingsing agar bisa digandakan." },
+                    { 
+                        type: 'question', 
+                        text: "[Siapa tokoh yang mengetik naskah Proklamasi?]",
+                        options: [
+                            { text: "Sukarni", correct: false, response: "Sukarni adalah yang mengusulkan agar naskah ditandatangani olehku dan Bung Karno, bukan pengetik." },
+                            { text: "Sayuti Melik", correct: true, response: "Tepat. Sayuti meminjam mesin tik dari kantor perwakilan AL Jerman. Ia juga melakukan beberapa ubahan ejaan penting." },
+                            { text: "Fatmawati", correct: false, response: "Ibu Fatmawati menjahit bendera Sang Saka Merah Putih, bukan mengetik naskah." }
+                        ]
+                    },
+                    { type: 'dialog', text: "Fajar hampir tiba. Bawalah gulungan teks Proklamasi ini kembali ke masamu. Merdeka!" },
+                    { type: 'reward', artifact: { icon: "fa-scroll", name: "Teks Proklamasi", color: "text-amber-100" } }
+                ]
+            }
+        ];
+
+        // --- GAME ENGINE ---
+        const engine = {
+            state: {
+                chapterIdx: 0,
+                nodeIdx: 0,
+                hp: 100,
+                artifacts: [],
+                isTyping: false,
+                currentInterval: null,
+                waitingForClick: false
+            },
+
+            // Audio System (Tone.js)
+            audio: {
+                ready: false, synths: {},
+                init() {
+                    if(this.ready) return;
+                    // Synth for typing text
+                    this.synths.type = new Tone.Synth({ oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+                    this.synths.type.volume.value = -20;
+                    // Synth for UI clicks/SFX
+                    this.synths.sfx = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" } }).toDestination();
+                    this.synths.sfx.volume.value = -12;
+                    this.ready = true;
+                    Tone.Transport.start();
+                },
+                play(type) {
+                    if(!this.ready) return;
+                    const now = Tone.now();
+                    try {
+                        if(type === 'type') this.synths.type.triggerAttackRelease("C5", "64n", now);
+                        else if(type === 'click') this.synths.sfx.triggerAttackRelease("E5", "32n", now);
+                        else if(type === 'correct') this.synths.sfx.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n", now);
+                        else if(type === 'wrong') this.synths.sfx.triggerAttackRelease(["C3", "G2"], "4n", now);
+                        else if(type === 'start') this.synths.sfx.triggerAttackRelease(["C4", "G4", "C5"], "4n", now);
+                        else if(type === 'reward') this.synths.sfx.triggerAttackRelease(["E5", "A5", "C6", "E6"], "2n", now);
+                    } catch(e){}
+                }
+            },
+
+            async startGame() {
+                try { await Tone.start(); this.audio.init(); } catch(e){}
+                this.audio.play('start');
+                
+                this.state.chapterIdx = 0;
+                this.state.nodeIdx = 0;
+                this.state.hp = 100;
+                this.state.artifacts = [];
+                this.updateUI();
+
+                document.getElementById('scene-menu').classList.add('opacity-0', 'pointer-events-none');
+                document.getElementById('status-panel').classList.remove('hidden');
+                
+                setTimeout(() => {
+                    document.getElementById('scene-menu').classList.add('hidden');
+                    this.loadChapter();
+                }, 500);
+            },
+
+            updateUI() {
+                const hpText = document.getElementById('hp-text');
+                const hpBar = document.getElementById('hp-bar');
+                
+                hpText.innerText = this.state.hp;
+                hpBar.style.width = `${this.state.hp}%`;
+                
+                if(this.state.hp > 50) { hpBar.className = "h-full w-full transition-all duration-300 bg-hp-green"; hpText.className = "font-dialog text-lg font-bold w-8 text-right text-hp-green"; }
+                else if(this.state.hp > 20) { hpBar.className = "h-full w-full transition-all duration-300 bg-yellow-500"; hpText.className = "font-dialog text-lg font-bold w-8 text-right text-yellow-500"; }
+                else { hpBar.className = "h-full w-full transition-all duration-300 bg-hp-red"; hpText.className = "font-dialog text-lg font-bold w-8 text-right text-hp-red animate-pulse"; }
+
+                for(let i=0; i<3; i++) {
+                    const slot = document.getElementById(`art-${i}`);
+                    if(this.state.artifacts[i]) {
+                        slot.innerHTML = `<i class="fa-solid ${this.state.artifacts[i].icon} ${this.state.artifacts[i].color} drop-shadow-[0_0_5px_rgba(255,255,255,0.8)] text-base"></i>`;
+                        slot.className = "w-8 h-8 rounded bg-slate-800 flex items-center justify-center border border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]";
+                    }
+                }
+            },
+
+            loadChapter() {
+                if (this.state.chapterIdx >= vnData.length) {
+                    this.gameWin();
+                    return;
+                }
+
+                const ch = vnData[this.state.chapterIdx];
+                this.state.nodeIdx = 0;
+                
+                const scene = document.getElementById('scene-vn');
+                scene.classList.remove('hidden');
+                scene.classList.add('flex');
+                
+                // Set Background
+                const bg = document.getElementById('vn-bg');
+                bg.className = `absolute inset-0 transition-all duration-1000 ${ch.bgClass}`;
+                setTimeout(() => { bg.classList.remove('opacity-0', 'scale-105'); }, 100);
+
+                // Set UI Elements
+                document.getElementById('vn-era-text').innerText = ch.eraText;
+                document.getElementById('vn-name').innerText = ch.npc.name;
+                
+                const portraitIcon = document.getElementById('vn-portrait-icon');
+                portraitIcon.className = `fa-solid ${ch.npc.icon} text-[100px] md:text-[140px] text-white drop-shadow-2xl`;
+                
+                // Show Portrait
+                const pCont = document.getElementById('vn-portrait-container');
+                pCont.classList.remove('opacity-0', 'translate-y-10');
+
+                // Start first dialog node
+                setTimeout(() => this.processNode(), 1000);
+            },
+
+            processNode() {
+                const ch = vnData[this.state.chapterIdx];
+                if (this.state.nodeIdx >= ch.nodes.length) {
+                    // Chapter End Transition
+                    this.endChapter();
+                    return;
+                }
+
+                const node = ch.nodes[this.state.nodeIdx];
+                const textBox = document.getElementById('vn-text');
+                const choicesBox = document.getElementById('vn-choices');
+                const continueIcon = document.getElementById('vn-continue-icon');
+                const dialogBox = document.getElementById('vn-dialog-box');
+
+                choicesBox.classList.add('hidden');
+                continueIcon.classList.add('hidden');
+                dialogBox.style.borderColor = "#eab308"; // Reset border to gold
+
+                if (node.type === 'dialog') {
+                    this.state.waitingForClick = false;
+                    this.typeText(node.text, () => {
+                        this.state.waitingForClick = true;
+                        continueIcon.classList.remove('hidden');
+                    });
+                } 
+                else if (node.type === 'question') {
+                    this.state.waitingForClick = false;
+                    dialogBox.style.borderColor = "#0ea5e9"; // Blue border for question
+                    this.typeText(node.text, () => {
+                        this.renderChoices(node.options);
+                    });
+                }
+                else if (node.type === 'reward') {
+                    this.audio.play('reward');
+                    this.state.artifacts.push(node.artifact);
+                    this.updateUI();
+                    
+                    dialogBox.style.borderColor = "#22c55e"; // Green border
+                    document.getElementById('vn-name').innerText = "SISTEM KAPSUL WAKTU";
+                    const rewardHtml = `ARTIPAK DIPEROLEH: <span class="text-yellow-400">[ ${node.artifact.name} ]</span>`;
+                    
+                    this.typeText(rewardHtml, () => {
+                        this.state.waitingForClick = true;
+                        continueIcon.classList.remove('hidden');
+                        document.getElementById('vn-name').innerText = ch.npc.name; // reset name
+                    }, true);
+                }
+            },
+
+            typeText(text, callback, isHtml = false) {
+                if (this.state.currentInterval) clearInterval(this.state.currentInterval);
+                
+                const textBox = document.getElementById('vn-text');
+                textBox.innerHTML = '';
+                this.state.isTyping = true;
+                
+                // If text is HTML (like reward span), we just print it instantly for safety, or we strip tags.
+                // For simplicity, if isHtml is true, print instant.
+                if (isHtml) {
+                    textBox.innerHTML = text + '<span class="blinking-cursor"></span>';
+                    this.state.isTyping = false;
+                    if(callback) callback();
+                    return;
+                }
+
+                let charIndex = 0;
+                this.state.currentInterval = setInterval(() => {
+                    textBox.innerHTML = text.substring(0, charIndex) + '<span class="blinking-cursor"></span>';
+                    if (charIndex % 3 === 0) this.audio.play('type');
+                    charIndex++;
+                    
+                    if (charIndex > text.length) {
+                        clearInterval(this.state.currentInterval);
+                        this.state.isTyping = false;
+                        if(callback) callback();
+                    }
+                }, 30);
+            },
+
+            nextDialog() {
+                if (this.state.isTyping) {
+                    // Skip typing
+                    clearInterval(this.state.currentInterval);
+                    const node = vnData[this.state.chapterIdx].nodes[this.state.nodeIdx];
+                    
+                    if(node.type === 'dialog' || node.type === 'question') {
+                        document.getElementById('vn-text').innerHTML = node.text + '<span class="blinking-cursor"></span>';
+                    }
+                    this.state.isTyping = false;
+                    
+                    if(node.type === 'dialog' || node.type === 'reward') {
+                        this.state.waitingForClick = true;
+                        document.getElementById('vn-continue-icon').classList.remove('hidden');
+                    } else if (node.type === 'question') {
+                        this.renderChoices(node.options);
+                    }
+                } 
+                else if (this.state.waitingForClick) {
+                    // Proceed to next node
+                    this.audio.play('click');
+                    this.state.nodeIdx++;
+                    this.processNode();
+                }
+            },
+
+            renderChoices(options) {
+                const choicesBox = document.getElementById('vn-choices');
+                choicesBox.innerHTML = '';
+                choicesBox.classList.remove('hidden');
+                choicesBox.classList.add('flex');
+
+                options.forEach((opt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full text-left font-dialog text-xl md:text-2xl p-4 bg-gradient-to-r from-slate-800 to-slate-900 border-2 border-slate-500 rounded text-slate-200 hover:border-yellow-400 hover:text-white transition-all shadow-choice-btn flex items-center gap-4 hover:translate-x-2";
+                    btn.innerHTML = `<span class="text-yellow-500 font-bold opacity-70">►</span> <span>${opt.text}</span>`;
+                    
+                    btn.onclick = (e) => {
+                        e.stopPropagation(); // prevent triggering nextDialog
+                        choicesBox.classList.add('hidden');
+                        this.handleAnswer(opt);
+                    };
+                    choicesBox.appendChild(btn);
+                });
+            },
+
+            handleAnswer(selectedOption) {
+                this.state.waitingForClick = false;
+                const dialogBox = document.getElementById('vn-dialog-box');
+                const continueIcon = document.getElementById('vn-continue-icon');
+
+                if (selectedOption.correct) {
+                    this.audio.play('correct');
+                    dialogBox.style.borderColor = "#22c55e"; // Green
+                    
+                    // Modify node text temporarily to show NPC response
+                    this.typeText(selectedOption.response, () => {
+                        this.state.waitingForClick = true;
+                        continueIcon.classList.remove('hidden');
+                        this.state.nodeIdx++; // Advance only if correct
+                    });
+                } else {
+                    this.audio.play('wrong');
+                    dialogBox.style.borderColor = "#ef4444"; // Red
+                    this.takeDamage(25);
+                    
+                    if (this.state.hp <= 0) {
+                        this.typeText("Energi habis... Realitas memudar...", () => {
+                            setTimeout(() => this.gameOver(), 1500);
+                        });
+                    } else {
+                        // Show wrong response, but DON'T advance nodeIdx (must retry)
+                        this.typeText(selectedOption.response + " (Sistem: Energi -25. Klik untuk mencoba lagi)", () => {
+                            this.state.waitingForClick = true;
+                            continueIcon.classList.remove('hidden');
+                            // We don't increment nodeIdx, so nextDialog() will replay the question node
+                        });
+                    }
+                }
+            },
+
+            takeDamage(amount) {
+                this.state.hp -= amount;
+                if(this.state.hp < 0) this.state.hp = 0;
+                this.updateUI();
+
+                // Visual FX
+                const overlay = document.getElementById('damage-overlay');
+                const scene = document.getElementById('scene-vn');
+                
+                overlay.classList.replace('bg-red-600/0', 'bg-red-600/40');
+                scene.classList.add('animate-shake');
+                
+                setTimeout(() => {
+                    overlay.classList.replace('bg-red-600/40', 'bg-red-600/0');
+                    scene.classList.remove('animate-shake');
+                }, 400);
+            },
+
+            endChapter() {
+                const bg = document.getElementById('vn-bg');
+                const pCont = document.getElementById('vn-portrait-container');
+                
+                bg.classList.add('opacity-0');
+                pCont.classList.add('opacity-0', 'translate-y-10');
+                
+                setTimeout(() => {
+                    this.state.chapterIdx++;
+                    this.loadChapter();
+                }, 1000);
+            },
+
+            gameOver() {
+                const endScene = document.getElementById('scene-end');
+                endScene.classList.remove('hidden');
+                endScene.classList.add('flex');
+                document.getElementById('status-panel').classList.add('hidden');
+                
+                document.getElementById('end-title').innerText = "ANOMALI FATAL";
+                document.getElementById('end-title').classList.add('text-hp-red');
+                document.getElementById('end-hp').innerText = "0";
+                document.getElementById('end-hp').classList.replace('text-hp-green', 'text-hp-red');
+                document.getElementById('end-msg').innerText = "Energi temporal habis. Anda terhapus dari garis waktu...";
+                document.getElementById('end-msg').className = "font-dialog text-2xl leading-relaxed text-red-200 bg-red-900/30 p-4 rounded border border-red-600/30";
+                
+                this.renderEndArtifacts();
+            },
+
+            gameWin() {
+                this.audio.play('correct'); // Replace with win sound later
+                const endScene = document.getElementById('scene-end');
+                endScene.classList.remove('hidden');
+                endScene.classList.add('flex');
+                document.getElementById('status-panel').classList.add('hidden');
+                
+                document.getElementById('end-hp').innerText = this.state.hp + "%";
+                let rank = this.state.hp === 100 ? "LEGENDA WAKTU" : "AHLI SEJARAH";
+                document.getElementById('end-msg').innerText = `Lompatan sukses! Pangkat: ${rank}. Bukti sejarah aman di tangan Anda.`;
+                
+                this.renderEndArtifacts();
+            },
+
+            renderEndArtifacts() {
+                const c = document.getElementById('end-artifacts');
+                c.innerHTML = '';
+                if(this.state.artifacts.length === 0) {
+                    c.innerHTML = '<span class="font-dialog text-xl text-slate-500">KOSONG</span>';
+                    return;
+                }
+                this.state.artifacts.forEach(art => {
+                    if(art) c.innerHTML += `<div class="w-16 h-16 rounded bg-slate-800 flex items-center justify-center border-2 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]"><i class="fa-solid ${art.icon} ${art.color} text-3xl"></i></div>`;
+                });
+            }
+        };
+    </script>
+</body>
+</html>
